@@ -1,40 +1,39 @@
-import pkg from "pg"
-const { Pool } = pkg
-import dotenv from "dotenv"
+import pkg from "pg";
+const { Pool } = pkg;
+import dotenv from "dotenv";
 
-dotenv.config()
+dotenv.config();
 
-// Debug environment variables
-console.log("Database connection details (sanitized):")
-console.log(`- DB_USER: ${process.env.DB_USER ? "✓ Set" : "✗ Not set"}`)
-console.log(`- DB_HOST: ${process.env.DB_HOST ? "✓ Set" : "✗ Not set"}`)
-console.log(`- DB_NAME: ${process.env.DB_NAME ? "✓ Set" : "✗ Not set"}`)
-console.log(`- DB_PASSWORD: ${process.env.DB_PASSWORD ? "✓ Set" : "✗ Not set"}`)
-console.log(`- DB_PORT: ${process.env.DB_PORT ? "✓ Set" : "✗ Not set"}`)
+// Determine if we're in production environment
+const isProduction = process.env.NODE_ENV === 'production';
 
-// Use explicit values from environment or fallback to hardcoded values for Render
-const dbConfig = {
-  user: process.env.DB_USER || "notification_system_user",
-  host: process.env.DB_HOST || "dpg-d04dsj95pdvs73c9634g-a.oregon-postgres.render.com",
-  database: process.env.DB_NAME || "notification_system",
-  password: process.env.DB_PASSWORD || "cE6KBplawPp189k4XBTE16Dq2Cgo0j9v",
-  port: Number.parseInt(process.env.DB_PORT || "5432"),
-  ssl: {
-    rejectUnauthorized: false, // Required for Render PostgreSQL
-  },
+// Configure connection options
+const connectionConfig = {
+  user: process.env.DB_USER,
+  host: process.env.DB_HOST,
+  database: process.env.DB_NAME,
+  password: process.env.DB_PASSWORD,
+  port: process.env.DB_PORT,
+};
+
+// Add SSL configuration for production (Render requires this)
+if (isProduction) {
+  connectionConfig.ssl = {
+    rejectUnauthorized: false // Required for Render PostgreSQL
+  };
 }
 
-// Create a new PostgreSQL connection pool with SSL for Render
-const pool = new Pool(dbConfig)
+// Create a new PostgreSQL connection pool
+const pool = new Pool(connectionConfig);
 
 // Test the database connection
 pool.query("SELECT NOW()", (err, res) => {
   if (err) {
-    console.error("Database connection error:", err.stack)
+    console.error("Database connection error:", err.stack);
   } else {
-    console.log("Database connected successfully")
+    console.log("Database connected successfully");
   }
-})
+});
 
 // Initialize database tables
 const initDb = async () => {
@@ -47,7 +46,7 @@ const initDb = async () => {
         password VARCHAR(255) NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
-    `)
+    `);
 
     // Create notifications table
     await pool.query(`
@@ -59,15 +58,28 @@ const initDb = async () => {
         is_read BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
-    `)
+    `);
 
-    console.log("Database tables initialized")
+    console.log("Database tables initialized");
   } catch (error) {
-    console.error("Error initializing database tables:", error)
+    console.error("Error initializing database tables:", error);
   }
-}
+};
+
+// Handle connection errors
+pool.on('error', (err) => {
+  console.error('Unexpected database error:', err);
+  // In production, you might want to implement reconnection logic here
+  if (isProduction) {
+    console.log('Attempting to reconnect to database...');
+    // Simple reconnection attempt after 5 seconds
+    setTimeout(() => {
+      pool.connect();
+    }, 5000);
+  }
+});
 
 // Initialize the database
-initDb()
+initDb();
 
-export default pool
+export default pool;
