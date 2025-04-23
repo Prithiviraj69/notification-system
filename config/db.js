@@ -4,17 +4,28 @@ import dotenv from "dotenv"
 
 dotenv.config()
 
-// Create a new PostgreSQL connection pool with SSL for Render
-const pool = new Pool({
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: process.env.DB_PASSWORD,
-  port: process.env.DB_PORT,
+// Debug environment variables
+console.log("Database connection details (sanitized):")
+console.log(`- DB_USER: ${process.env.DB_USER ? "✓ Set" : "✗ Not set"}`)
+console.log(`- DB_HOST: ${process.env.DB_HOST ? "✓ Set" : "✗ Not set"}`)
+console.log(`- DB_NAME: ${process.env.DB_NAME ? "✓ Set" : "✗ Not set"}`)
+console.log(`- DB_PASSWORD: ${process.env.DB_PASSWORD ? "✓ Set" : "✗ Not set"}`)
+console.log(`- DB_PORT: ${process.env.DB_PORT ? "✓ Set" : "✗ Not set"}`)
+
+// Use explicit values from environment or fallback to hardcoded values for Render
+const dbConfig = {
+  user: process.env.DB_USER || "notification_system_user",
+  host: process.env.DB_HOST || "dpg-d04dsj95pdvs73c9634g-a.oregon-postgres.render.com",
+  database: process.env.DB_NAME || "notification_system",
+  password: process.env.DB_PASSWORD || "cE6KBplawPp189k4XBTE16Dq2Cgo0j9v",
+  port: Number.parseInt(process.env.DB_PORT || "5432"),
   ssl: {
     rejectUnauthorized: false, // Required for Render PostgreSQL
   },
-})
+}
+
+// Create a new PostgreSQL connection pool with SSL for Render
+const pool = new Pool(dbConfig)
 
 // Test the database connection
 pool.query("SELECT NOW()", (err, res) => {
