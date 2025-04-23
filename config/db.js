@@ -4,13 +4,16 @@ import dotenv from "dotenv"
 
 dotenv.config()
 
-// Create a new PostgreSQL connection pool
+// Create a new PostgreSQL connection pool with SSL for Render
 const pool = new Pool({
   user: process.env.DB_USER,
   host: process.env.DB_HOST,
   database: process.env.DB_NAME,
   password: process.env.DB_PASSWORD,
   port: process.env.DB_PORT,
+  ssl: {
+    rejectUnauthorized: false, // Required for Render PostgreSQL
+  },
 })
 
 // Test the database connection
