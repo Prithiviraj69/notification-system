@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include('partials/head') %>
+  <title><%= title %></title>
+</head>
+<body>
+  <%- include('partials/header') %>
+  
+  <div class="container mt-5">
+    <div class="jumbotron">
+      <h1 class="display-4">Welcome to the Notification System</h1>
+      <p class="lead">A real-time notification system with user authentication.</p>
+      <hr class="my-4">
+      <p>Get started by registering an account or logging in if you already have one.</p>
+      <div class="mt-4">
+        <a href="/users/login" class="btn btn-primary mr-3">Login</a>
+        <a href="/users/register" class="btn btn-secondary">Register</a>
+      </div>
+    </div>
+  </div>
+
+  <%- include('partials/footer') %>
+</body>
+</html>

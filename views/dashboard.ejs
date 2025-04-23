@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include('partials/head') %>
+  <title><%= title %></title>
+  <style>
+    .notification {
+      transition: background-color 0.3s;
+    }
+    .notification.unread {
+      background-color: #f8f9fa;
+    }
+    .notification-badge {
+      position: absolute;
+      top: -5px;
+      right: -5px;
+    }
+  </style>
+</head>
+<body>
+  <%- include('partials/header') %>
+  
+  <div class="container mt-5">
+    <div class="row">
+      <div class="col-md-4">
+        <div class="card mb-4">
+          <div class="card-header">
+            <h4>Send Notification</h4>
+          </div>
+          <div class="card-body">
+            <form id="send-notification-form">
+              <div class="form-group">
+                <label for="receiver">Recipient</label>
+                <select class="form-control" id="receiver" required>
+                  <option value="">Select a user</option>
+                  <!-- Users will be loaded here -->
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="message">Message</label>
+                <textarea class="form-control" id="message" rows="3" maxlength="255" required></textarea>
+                <small class="text-muted">Max 255 characters</small>
+              </div>
+              <button type="submit" class="btn btn-primary btn-block">Send</button>
+            </form>
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-md-8">
+        <div class="card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h4>
+              Notifications
+              <span id="notification-count" class="badge badge-pill badge-primary ml-2">0</span>
+            </h4>
+            <div>
+              <button id="mark-all-read" class="btn btn-sm btn-outline-secondary">Mark All as Read</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div id="notifications-container">
+              <div class="text-center py-5">
+                <p class="text-muted">Loading notifications...</p>
+              </div>
+            </div>
+            <div id="load-more-container" class="text-center mt-3 d-none">
+              <button id="load-more" class="btn btn-outline-primary">Load More</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%- include('partials/footer') %>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    // Current user info
+    const currentUser = {
+      userId: '<%= user.userId %>',
+      username: '<%= user.username %>'
+    };
+    
+    // Connect to Socket.IO
+    const socket = io();
+    
+    // Socket connection events
+    socket.on('connect', () => {
+      console.log('Socket connected with ID:', socket.id);
+      
+      // Authenticate with socket
+      socket.emit('authenticate', currentUser.userId);
+    });
+    
+    socket.on('disconnect', () => {
+      console.log('Socket disconnected');
+    });
+    
+    socket.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
+    });
+    
+    // Variables for pagination
+    let currentPage = 1;
+    const limit = 10;
+    let hasMore = false;
+    let unreadCount = 0;
+    
+    // DOM elements
+    const notificationsContainer = document.getElementById('notifications-container');
+    const notificationCount = document.getElementById('notification-count');
+    const loadMoreBtn = document.getElementById('load-more');
+    const loadMoreContainer = document.getElementById('load-more-container');
+    
+    // Get JWT token from cookie
+    function getToken() {
+      const cookies = document.cookie.split(';');
+      for (const cookie of cookies) {
+        const [name, value] = cookie.trim().split('=');
+        if (name === 'token') {
+          return value;
+        }
+      }
+      return null;
+    }
+    
+    // Load users for the dropdown
+    async function loadUsers() {
+      try {
+        const response = await fetch('/users/all', {
+          headers: {
+            'Authorization': `Bearer ${getToken()}`
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to load users');
+        }
+        
+        const users = await response.json();
+        const receiverSelect = document.getElementById('receiver');
+        
+        // Clear existing options except the first one
+        while (receiverSelect.options.length > 1) {
+          receiverSelect.remove(1);
+        }
+        
+        users.forEach(user => {
+          if (user.id !== parseInt(currentUser.userId)) {
+            const option = document.createElement('option');
+            option.value = user.id;
+            option.textContent = user.username;
+            receiverSelect.appendChild(option);
+          }
+        });
+      } catch (error) {
+        console.error('Error loading users:', error);
+      }
+    }
+    
+    // Load notifications
+    async function loadNotifications(page = 1) {
+      try {
+        if (page === 1) {
+          notificationsContainer.innerHTML = '<div class="text-center py-5"><p class="text-muted">Loading notifications...</p></div>';
+        }
+        
+        const response = await fetch(`/notifications?page=${page}&limit=${limit}`, {
+          headers: {
+            'Authorization': `Bearer ${getToken()}`
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to load notifications');
+        }
+        
+        const data = await response.json();
+        const notifications = data.notifications;
+        
+        console.log('Loaded notifications:', notifications);
+        
+        if (page === 1) {
+          notificationsContainer.innerHTML = '';
+        }
+        
+        if (notifications.length === 0 && page === 1) {
+          notificationsContainer.innerHTML = '<div class="text-center py-5"><p class="text-muted">No notifications yet</p></div>';
+          return;
+        }
+        
+        // Update pagination state
+        hasMore = data.pagination.hasMore;
+        loadMoreContainer.classList.toggle('d-none', !hasMore);
+        
+        // Count unread notifications
+        if (page === 1) {
+          unreadCount = notifications.filter(n => !n.is_read).length;
+          notificationCount.textContent = unreadCount;
+        } else {
+          unreadCount += notifications.filter(n => !n.is_read).length;
+          notificationCount.textContent = unreadCount;
+        }
+        
+        // Render notifications
+        notifications.forEach(notification => {
+          renderNotification(notification, false); // false means don't prepend
+        });
+      } catch (error) {
+        console.error('Error loading notifications:', error);
+        notificationsContainer.innerHTML = '<div class="text-center py-5"><p class="text-danger">Failed to load notifications</p></div>';
+      }
+    }
+    
+    // Render a notification
+    function renderNotification(notification, prepend = true) {
+      const notificationElement = document.createElement('div');
+      notificationElement.className = `notification p-3 mb-2 border-bottom ${notification.is_read ? '' : 'unread'}`;
+      notificationElement.dataset.id = notification.id;
+      
+      const date = new Date(notification.created_at);
+      const formattedDate = date.toLocaleString();
+      
+      notificationElement.innerHTML = `
+        <div class="d-flex justify-content-between">
+          <strong>${notification.sender_username}</strong>
+          <small class="text-muted">${formattedDate}</small>
+        </div>
+        <p class="mb-1">${notification.message}</p>
+        ${!notification.is_read ? 
+          '<button class="btn btn-sm btn-link mark-read p-0">Mark as read</button>' : 
+          '<span class="text-muted small">Read</span>'}
+      `;
+      
+      if (prepend) {
+        // Add to the top for new notifications
+        if (notificationsContainer.firstChild) {
+          notificationsContainer.insertBefore(notificationElement, notificationsContainer.firstChild);
+        } else {
+          notificationsContainer.appendChild(notificationElement);
+        }
+      } else {
+        // Add to the bottom for loaded notifications
+        notificationsContainer.appendChild(notificationElement);
+      }
+      
+      // Add event listener for mark as read button
+      const markReadBtn = notificationElement.querySelector('.mark-read');
+      if (markReadBtn) {
+        markReadBtn.addEventListener('click', () => {
+          markAsRead(notification.id);
+        });
+      }
+    }
+    
+    // Mark notification as read
+    async function markAsRead(notificationId) {
+      try {
+        const response = await fetch(`/notifications/${notificationId}/read`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${getToken()}`
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to mark notification as read');
+        }
+        
+        // Update UI
+        const notificationElement = document.querySelector(`.notification[data-id="${notificationId}"]`);
+        if (notificationElement) {
+          notificationElement.classList.remove('unread');
+          const markReadBtn = notificationElement.querySelector('.mark-read');
+          if (markReadBtn) {
+            const readSpan = document.createElement('span');
+            readSpan.className = 'text-muted small';
+            readSpan.textContent = 'Read';
+            markReadBtn.parentNode.replaceChild(readSpan, markReadBtn);
+          }
+        }
+        
+        // Update unread count
+        unreadCount = Math.max(0, unreadCount - 1);
+        notificationCount.textContent = unreadCount;
+      } catch (error) {
+        console.error('Error marking notification as read:', error);
+      }
+    }
+    
+    // Mark all notifications as read
+    async function markAllAsRead() {
+      try {
+        const response = await fetch('/notifications/read-all', {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${getToken()}`
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to mark all notifications as read');
+        }
+        
+        // Update UI
+        document.querySelectorAll('.notification.unread').forEach(el => {
+          el.classList.remove('unread');
+          const markReadBtn = el.querySelector('.mark-read');
+          if (markReadBtn) {
+            const readSpan = document.createElement('span');
+            readSpan.className = 'text-muted small';
+            readSpan.textContent = 'Read';
+            markReadBtn.parentNode.replaceChild(readSpan, markReadBtn);
+          }
+        });
+        
+        // Update unread count
+        unreadCount = 0;
+        notificationCount.textContent = unreadCount;
+      } catch (error) {
+        console.error('Error marking all notifications as read:', error);
+      }
+    }
+    
+    // Send notification
+    async function sendNotification(receiverId, message) {
+      try {
+        const response = await fetch('/notifications/send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${getToken()}`
+          },
+          body: JSON.stringify({
+            senderId: currentUser.userId,
+            receiverId,
+            message
+          })
+        });
+        
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || 'Failed to send notification');
+        }
+        
+        return true;
+      } catch (error) {
+        console.error('Error sending notification:', error);
+        return false;
+      }
+    }
+    
+    // Handle new notification from socket
+    socket.on('new_notification', (notification) => {
+      console.log('New notification received:', notification);
+      
+      // Remove "No notifications yet" message if present
+      const noNotificationsMsg = notificationsContainer.querySelector('.text-muted');
+      if (noNotificationsMsg && noNotificationsMsg.textContent === 'No notifications yet') {
+        notificationsContainer.innerHTML = '';
+      }
+      
+      // Increment unread count
+      unreadCount++;
+      notificationCount.textContent = unreadCount;
+      
+      // Create notification object
+      const notificationObj = {
+        id: notification.id,
+        sender_username: notification.senderUsername,
+        message: notification.message,
+        is_read: false,
+        created_at: notification.createdAt
+      };
+      
+      // Render the notification at the top of the list
+      renderNotification(notificationObj, true);
+      
+      // Show notification alert
+      showNotificationAlert(notification.senderUsername, notification.message);
+    });
+    
+    // Show notification alert
+    function showNotificationAlert(sender, message) {
+      // Check if browser supports notifications
+      if (!("Notification" in window)) {
+        return;
+      }
+      
+      // Check if permission is already granted
+      if (Notification.permission === "granted") {
+        const notification = new Notification("New notification", {
+          body: `${sender}: ${message}`,
+          icon: "/favicon.ico"
+        });
+      }
+      // Otherwise, ask for permission
+      else if (Notification.permission !== "denied") {
+        Notification.requestPermission().then(permission => {
+          if (permission === "granted") {
+            const notification = new Notification("New notification", {
+              body: `${sender}: ${message}`,
+              icon: "/favicon.ico"
+            });
+          }
+        });
+      }
+    }
+    
+    // Event listeners
+    document.addEventListener('DOMContentLoaded', () => {
+      // Load initial data
+      loadUsers();
+      loadNotifications();
+      
+      // Send notification form
+      document.getElementById('send-notification-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const receiverId = document.getElementById('receiver').value;
+        const message = document.getElementById('message').value;
+        
+        if (!receiverId || !message) {
+          return;
+        }
+        
+        const success = await sendNotification(receiverId, message);
+        
+        if (success) {
+          document.getElementById('message').value = '';
+          alert('Notification sent successfully!');
+        } else {
+          alert('Failed to send notification. Please try again.');
+        }
+      });
+      
+      // Load more button
+      loadMoreBtn.addEventListener('click', () => {
+        currentPage++;
+        loadNotifications(currentPage);
+      });
+      
+      // Mark all as read button
+      document.getElementById('mark-all-read').addEventListener('click', markAllAsRead);
+      
+      // Request notification permission
+      if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
+        Notification.requestPermission();
+      }
+    });
+  </script>
+</body>
+</html>

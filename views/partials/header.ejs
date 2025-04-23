@@ -1,0 +1,43 @@
+<header>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+      <div class="container">
+        <a class="navbar-brand" href="/">Notification System</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav ml-auto">
+            <% if (typeof user !== 'undefined') { %>
+              <li class="navbar-text mr-3">
+                Welcome, <%= user.username %>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="/notifications/dashboard">Dashboard</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="#" id="logout-link">Logout</a>
+              </li>
+            <% } else { %>
+              <li class="nav-item">
+                <a class="nav-link" href="/users/login">Login</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="/users/register">Register</a>
+              </li>
+            <% } %>
+          </ul>
+        </div>
+      </div>
+    </nav>
+    
+    <% if (typeof user !== 'undefined') { %>
+      <script>
+        document.getElementById('logout-link').addEventListener('click', (e) => {
+          e.preventDefault();
+          document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+          window.location.href = '/users/login';
+        });
+      </script>
+    <% } %>
+  </header>
+  

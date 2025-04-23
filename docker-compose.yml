@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+    environment:
+      - PORT=3000
+      - NODE_ENV=development
+      - DB_USER=postgres
+      - DB_HOST=db  # Keep as 'db' - this is the service name in Docker networking
+      - DB_NAME=notification_system
+      - DB_PASSWORD=@bhimanyU69  # Updated to match your .env
+      - DB_PORT=5433  # Keep as 5432 inside Docker
+      - JWT_SECRET=9d3cd6f6ffabeb1f43e77f48fba0386d46a255bfa0ae66a0f7bd883021a593dfcc8f94bb042485104be5446d16e887ee7745571c5ab0ee4012fa748af84833f6
+      - JWT_EXPIRES_IN=24h
+    volumes:
+      - .:/app
+      - /app/node_modules
+
+  db:
+    image: postgres:14-alpine
+    ports:
+      - "5433:5432"  # Map host port 5433 to container port 5432
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=@bhimanyU69  # Updated to match your .env
+      - POSTGRES_DB=notification_system
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

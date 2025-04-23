@@ -1,0 +1,33 @@
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  footer {
+    margin-top: auto;
+  }
+  
+  .notification {
+    border-radius: 4px;
+    transition: all 0.3s ease;
+  }
+  
+  .notification:hover {
+    background-color: #f8f9fa;
+  }
+  
+  .notification.unread {
+    border-left: 3px solid #007bff;
+  }
+  
+  .notification .mark-read {
+    color: #6c757d;
+    text-decoration: none;
+  }
+  
+  .notification .mark-read:hover {
+    color: #007bff;
+    text-decoration: underline;
+  }
+  

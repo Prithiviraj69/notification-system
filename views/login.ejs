@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include('partials/head') %>
+  <title><%= title %></title>
+</head>
+<body>
+  <%- include('partials/header') %>
+  
+  <div class="container mt-5">
+    <div class="row justify-content-center">
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">
+            <h3>Login</h3>
+          </div>
+          <div class="card-body">
+            <div id="error-message" class="alert alert-danger d-none"></div>
+            <form id="login-form">
+              <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" class="form-control" id="username" name="username" required>
+              </div>
+              <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" class="form-control" id="password" name="password" required>
+              </div>
+              <button type="submit" class="btn btn-primary btn-block">Login</button>
+            </form>
+            <div class="mt-3 text-center">
+              <p>Don't have an account? <a href="/users/register">Register</a></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%- include('partials/footer') %>
+
+  <script>
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const errorMessage = document.getElementById('error-message');
+      
+      try {
+        const response = await fetch('/users/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ username, password })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Login failed');
+        }
+        
+        // Store token in cookie
+        document.cookie = `token=${data.token}; path=/; max-age=86400`;
+        
+        // Redirect to dashboard
+        window.location.href = '/notifications/dashboard';
+      } catch (error) {
+        errorMessage.textContent = error.message;
+        errorMessage.classList.remove('d-none');
+      }
+    });
+  </script>
+</body>
+</html>
